@@ -1,4 +1,4 @@
 
 ![model](https://i.imgur.com/hLgbRJH.png)
 
-Resnet-50
+  Resnet-50
