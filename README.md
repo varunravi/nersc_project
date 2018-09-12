@@ -3,4 +3,5 @@
 
   Resnet-50
 
-![model_2](https://imgur.com/34fad4ef-c2ff-4913-8552-e7402919b21d)
+![model_2](https://i.imgur.com/uFcUeeH.png)
+current tensorboard graph
