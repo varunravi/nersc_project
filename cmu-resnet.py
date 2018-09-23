@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
-import horovod.tensorflow as hvd
-from util.graph import cmu_resnet
+# import horovod.tensorflow as hvd
+from util.graph import resnet50
 
 print(tf.__version__)
 
@@ -16,7 +16,6 @@ x_test = x_test.reshape(x_test.shape[0], x_test.shape[2], x_test.shape[3], x_tes
 JOBID = 'cmu_resnet-v1'
 CHPKT = '~/chkpt'
 EPOCH = 10
-NUM_CLASS = 10
 BATCH_SIZE = 32
 TOTAL_STEPS = x_train.shape[0]/BATCH_SIZE*EPOCH
 HEIGHT = x_train.shape[1]
@@ -47,7 +46,9 @@ def run_dist():
                 
 if __name__ == '__main__':
     
-    g = cmu_resnet(width=101, height=101, channels=3, num_class=10)
+    g = resnet50(width=101, height=101, channels=3)
+
+    
     
 #     if distributed:
 #         run_dist()
