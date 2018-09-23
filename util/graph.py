@@ -6,11 +6,26 @@ def resnet50(
     width, 
     height, 
     channels, 
+    batch_size,
+    epochs,
     distributed_mode=False):
 
+
+    # DATA PROCESSING
     x = tf.placeholder(dtype=tf.float32, shape=[None, width, height, channels], name='x')
     y = tf.placeholder(dtype=tf.int64, shape=None, name='y')
 
+    handle = tf.placeholder(dtype=tf.string, shape=[])
+    dataset = tf.data.Dataset.from_tensor_slices((x, y)).shuffle(buffer_size=10000).batch(batch_size).repeat()
+
+    iterator = tf.data.Iterator.from_string_handle(string_handle=handle, output_types=(x.dtype, y.dtype), output_shapes=(x.shape, y.shape))
+    
+    training_iterator = dataset.make_initializable_iterator()
+    validation_iterator = dataset.make_initializable_iterator()
+    
+    next_element = iterator.get_next()
+
+    # RESNET
     with tf.variable_scope("conv1", reuse=tf.AUTO_REUSE):
         layer = conv2D(layer=x, ft_size=64, name='_1', ksize=7, strides=[1, 2, 2, 1])
 
@@ -63,9 +78,9 @@ def resnet50(
         b_fully = tf.get_variable(name='b_fully', shape=[1000], dtype=tf.float32, initializer=tf.zeros_initializer())
         layer = tf.matmul(layer, w_fully) + b_fully
 
-        w_loss = tf.get_variable(name='w_loss', shape=[layer.shape[1], 1], dtype=tf.float32, initializer=tf.contrib.layers.xavier_initializer())
-        b_loss = tf.get_variable(name='b_loss', shape=[1], dtype=tf.float32, initializer=tf.zeros_initializer())
-        layer = tf.matmul(layer, w_loss) + b_loss
+        w_pred = tf.get_variable(name='w_pred', shape=[layer.shape[1], 1], dtype=tf.float32, initializer=tf.contrib.layers.xavier_initializer())
+        b_pred = tf.get_variable(name='b_pred', shape=[1], dtype=tf.float32, initializer=tf.zeros_initializer())
+        layer = tf.matmul(layer, w_pred) + b_pred
 
     with tf.variable_scope("loss", reuse=tf.AUTO_REUSE):
         loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(y, tf.float32), logits=layer))
@@ -74,6 +89,8 @@ def resnet50(
         global_step = tf.train.get_or_create_global_step()
         train_op = optimize.minimize(loss, global_step=global_step)
 
+
+    # PREDICTION/STATISTICS
     with tf.variable_scope("prediction", reuse=tf.AUTO_REUSE):     
         pred = tf.sigmoid(x=layer)
 
@@ -85,11 +102,6 @@ def resnet50(
         tf.summary.scalar('recall', recall)
         tf.summary.scalar('AUC', auc)
 
-    if distributed_mode:
-        tf.summary.scalar('loss', loss)
-        merged = tf.summary.merge_all()
-
-    else:
         tf.summary.scalar('loss', loss)
         merged = tf.summary.merge_all()
 
