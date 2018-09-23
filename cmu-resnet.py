@@ -1,6 +1,5 @@
 import tensorflow as tf
 import numpy as np
-# import horovod.tensorflow as hvd
 from util.graph import resnet50
 
 print(tf.__version__)
@@ -28,8 +27,6 @@ def run_dist():
     config.intra_op_parallelism_threads = 68
     config.inter_op_parallelism_threads = 4
 
-    checkpoint_dir = './train_logs' if hvd.rank() == 0 else None
-
     with tf.train.MonitoredTrainingSession(checkpoint_dir=checkpoint_dir, hooks=hooks, config=config) as mon_sess:
         train_writer = tf.summary.FileWriter(checkpoint_dir, mon_sess.graph)
         while not mon_sess.should_stop():
@@ -46,7 +43,7 @@ def run_dist():
                 
 if __name__ == '__main__':
     
-    g = resnet50(width=101, height=101, channels=3)
+    [merged, loss, optimize, layer] = resnet50(width=101, height=101, channels=3)
 
     
     

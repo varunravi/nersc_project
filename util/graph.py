@@ -2,14 +2,14 @@ import tensorflow as tf
 from util.layer import conv2D, respath_fn
     
 
-def resnet50(width, height, channels, distributed_mode=False):
+def resnet50(
+    width, 
+    height, 
+    channels, 
+    distributed_mode=False):
 
     x = tf.placeholder(dtype=tf.float32, shape=[None, width, height, channels], name='x')
     y = tf.placeholder(dtype=tf.int64, shape=None, name='y')
-
-    if distributed_mode:
-        with tf.variable_scope("hvd", reuse=tf.AUTO_REUSE):
-            hvd.init()
 
     with tf.variable_scope("conv1", reuse=tf.AUTO_REUSE):
         layer = conv2D(layer=x, ft_size=64, name='_1', ksize=7, strides=[1, 2, 2, 1])
@@ -57,7 +57,8 @@ def resnet50(width, height, channels, distributed_mode=False):
     with tf.variable_scope("output", reuse=tf.AUTO_REUSE):      
         layer = tf.nn.avg_pool(value=layer, ksize=[1, 3, 3, 1], strides=[1, 1, 1, 1], padding='SAME', name='avg_pool')
         
-        layer = tf.contrib.layers.flatten(layer)    
+        layer = tf.contrib.layers.flatten(layer)  
+
         w_fully = tf.get_variable(name='w_fully', shape=[layer.shape[1], 1000], dtype=tf.float32, initializer=tf.contrib.layers.xavier_initializer())
         b_fully = tf.get_variable(name='b_fully', shape=[1000], dtype=tf.float32, initializer=tf.zeros_initializer())
         layer = tf.matmul(layer, w_fully) + b_fully
@@ -70,27 +71,29 @@ def resnet50(width, height, channels, distributed_mode=False):
         loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(y, tf.float32), logits=layer))
         
         optimize = tf.train.AdagradOptimizer(1e-4)
-        if distributed_mode:
-            optimize = hvd.DistributedOptimizer(optimize)
-            
-            hooks = [hvd.BroadcastGlobalVariablesHook(0)]
-            hooks.append(tf.train.StopAtStepHook(last_step=num_steps_total))
-
         global_step = tf.train.get_or_create_global_step()
         train_op = optimize.minimize(loss, global_step=global_step)
 
     with tf.variable_scope("prediction", reuse=tf.AUTO_REUSE):     
         pred = tf.sigmoid(x=layer)
 
+        precision = tf.metrics.precision(y, pred)
+        recall = tf.metrics.recall(y, pred)
+        auc = tf.metrics.auc(y, pred)
+
+        tf.summary.scalar('precision', precision)
+        tf.summary.scalar('recall', recall)
+        tf.summary.scalar('AUC', auc)
+
     if distributed_mode:
-        if hvd.rank() == 0:
-            tf.summary.scalar('loss', loss)
-            merged = tf.summary.merge_all()
+        tf.summary.scalar('loss', loss)
+        merged = tf.summary.merge_all()
+
     else:
         tf.summary.scalar('loss', loss)
         merged = tf.summary.merge_all()
 
-    return merged, layer
+    return merged, loss, optimize, layer
 
 
 
